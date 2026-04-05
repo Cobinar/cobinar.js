@@ -1,13 +1,13 @@
 (function () {
+  const qs = (sel) => document.querySelector(sel);
+
   const show = (sel) => {
-    if (!sel) return;
-    const el = document.querySelector(sel);
+    const el = qs(sel);
     if (el) el.style.display = "block";
   };
 
   const hide = (sel) => {
-    if (!sel) return;
-    const el = document.querySelector(sel);
+    const el = qs(sel);
     if (el) el.style.display = "none";
   };
 
@@ -32,33 +32,12 @@
       }
     }),
 
-    // 🔥 SMART BIND (accepts function OR URL)
-    bind: async (selector, source) => {
-      const el = document.querySelector(selector);
-      if (!el) return;
-
-      try {
-        let data;
-
-        if (typeof source === "string") {
-          data = await fetch(source).then(res => res.json());
-        } else {
-          data = await source();
-        }
-
-        el.innerText =
-          typeof data === "object" ? JSON.stringify(data, null, 2) : data;
-      } catch {
-        el.innerText = "Error loading data";
-      }
-    },
-
-    // ⚡ ACTION (improved)
+    // ⚡ ACTION
     action: ({ trigger, request, loading, success, error }) => {
-      const btn = document.querySelector(trigger);
+      const btn = qs(trigger);
       if (!btn) return;
 
-      btn.addEventListener("click", async () => {
+      btn.onclick = async () => {
         try {
           show(loading);
           hide(success);
@@ -72,19 +51,74 @@
           hide(loading);
           show(error);
         }
-      });
+      };
     },
 
-    // 🧾 FORM HANDLER (NEW 🔥)
+    // 🧠 STATE (FIXED + SMOOTH)
+    state: (initial) => {
+      const listeners = {};
+
+      const notify = (key, value) => {
+        if (listeners[key]) {
+          listeners[key].forEach((fn) => fn(value));
+        }
+      };
+
+      const state = new Proxy(initial, {
+        set(target, key, value) {
+          target[key] = value;
+          notify(key, value);
+          return true;
+        }
+      });
+
+      // bind UI
+      state.bind = (key, selector) => {
+        const el = qs(selector);
+        if (!el) return;
+
+        if (!listeners[key]) listeners[key] = [];
+
+        listeners[key].push((value) => {
+          el.style.transition = "opacity 0.3s";
+          el.style.opacity = 0;
+
+          setTimeout(() => {
+            el.innerText =
+              typeof value === "object"
+                ? JSON.stringify(value, null, 2)
+                : value;
+
+            el.style.opacity = 1;
+          }, 150);
+        });
+
+        // initial render
+        notify(key, state[key]);
+      };
+
+      return state;
+    },
+
+    // 🔄 API → STATE SYNC (NEW)
+    sync: async (state, key, url) => {
+      try {
+        const data = await fetch(url).then((r) => r.json());
+        state[key] = data;
+      } catch {
+        console.error("Sync failed");
+      }
+    },
+
+    // 🧾 FORM
     form: (selector, { url, method = "POST", loading, success, error }) => {
-      const form = document.querySelector(selector);
+      const form = qs(selector);
       if (!form) return;
 
-      form.addEventListener("submit", async (e) => {
+      form.onsubmit = async (e) => {
         e.preventDefault();
 
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
+        const data = Object.fromEntries(new FormData(form).entries());
 
         try {
           show(loading);
@@ -105,64 +139,25 @@
           hide(loading);
           show(error);
         }
-      });
+      };
     },
 
-    // ✨ SIMPLE ANIMATIONS (NEW 🔥)
-    fadeIn: (selector, duration = 500) => {
-      const el = document.querySelector(selector);
-      if (!el) return;
+    // 💳 STRIPE HELPER (READY FOR YOUR API)
+    pay: async (url) => {
+      try {
+        const res = await fetch(url, { method: "POST" });
+        const data = await res.json();
 
-      el.style.opacity = 0;
-      el.style.display = "block";
-
-      let last = +new Date();
-      const tick = function () {
-        el.style.opacity = +el.style.opacity + (new Date() - last) / duration;
-        last = +new Date();
-
-        if (+el.style.opacity < 1) {
-          requestAnimationFrame(tick);
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          console.error("No checkout URL returned");
         }
-      };
-
-      tick();
+      } catch {
+        console.error("Payment failed");
+      }
     }
   };
 
   window.cobinar = cobinar;
 })();
-
-state: (initial) => {
-  const listeners = {};
-
-  const notify = (key, value) => {
-    if (listeners[key]) {
-      listeners[key].forEach((fn) => fn(value));
-    }
-  };
-
-  const state = new Proxy(initial, {
-    set(target, key, value) {
-      target[key] = value;
-      notify(key, value);
-      return true;
-    }
-  });
-
-  state.bind = (key, selector) => {
-    const el = document.querySelector(selector);
-    if (!el) return;
-
-    if (!listeners[key]) listeners[key] = [];
-
-    listeners[key].push((value) => {
-      el.innerText = value;
-    });
-
-    // initial render
-    el.innerText = state[key];
-  };
-
-  return state;
-}
