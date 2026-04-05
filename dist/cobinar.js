@@ -2,21 +2,25 @@
   const qs = (sel) => document.querySelector(sel);
 
   const show = (sel) => {
+    if (!sel) return;
     const el = qs(sel);
     if (el) el.style.display = "block";
   };
 
   const hide = (sel) => {
+    if (!sel) return;
     const el = qs(sel);
     if (el) el.style.display = "none";
   };
 
   const cobinar = {
-    // 🔌 API
+    // =========================
+    // 🔌 API HANDLER
+    // =========================
     api: (url) => ({
       get: async () => {
         const res = await fetch(url);
-        if (!res.ok) throw new Error("Request failed");
+        if (!res.ok) throw new Error("GET request failed");
         return res.json();
       },
 
@@ -27,12 +31,14 @@
           body: JSON.stringify(data)
         });
 
-        if (!res.ok) throw new Error("Request failed");
+        if (!res.ok) throw new Error("POST request failed");
         return res.json();
       }
     }),
 
-    // ⚡ ACTION
+    // =========================
+    // ⚡ ACTION HANDLER
+    // =========================
     action: ({ trigger, request, loading, success, error }) => {
       const btn = qs(trigger);
       if (!btn) return;
@@ -47,15 +53,18 @@
 
           hide(loading);
           show(success);
-        } catch {
+        } catch (e) {
+          console.error(e);
           hide(loading);
           show(error);
         }
       };
     },
 
-    // 🧠 STATE (FIXED + SMOOTH)
-    state: (initial) => {
+    // =========================
+    // 🧠 REACTIVE STATE SYSTEM
+    // =========================
+    state: (initial = {}) => {
       const listeners = {};
 
       const notify = (key, value) => {
@@ -72,7 +81,7 @@
         }
       });
 
-      // bind UI
+      // bind UI element to state key
       state.bind = (key, selector) => {
         const el = qs(selector);
         if (!el) return;
@@ -80,7 +89,7 @@
         if (!listeners[key]) listeners[key] = [];
 
         listeners[key].push((value) => {
-          el.style.transition = "opacity 0.3s";
+          el.style.transition = "opacity 0.2s ease";
           el.style.opacity = 0;
 
           setTimeout(() => {
@@ -90,7 +99,7 @@
                 : value;
 
             el.style.opacity = 1;
-          }, 150);
+          }, 100);
         });
 
         // initial render
@@ -100,17 +109,24 @@
       return state;
     },
 
-    // 🔄 API → STATE SYNC (NEW)
+    // =========================
+    // 🔄 API → STATE SYNC
+    // =========================
     sync: async (state, key, url) => {
       try {
-        const data = await fetch(url).then((r) => r.json());
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Sync failed");
+
+        const data = await res.json();
         state[key] = data;
-      } catch {
-        console.error("Sync failed");
+      } catch (e) {
+        console.error("Sync error:", e);
       }
     },
 
-    // 🧾 FORM
+    // =========================
+    // 🧾 FORM HANDLER
+    // =========================
     form: (selector, { url, method = "POST", loading, success, error }) => {
       const form = qs(selector);
       if (!form) return;
@@ -131,33 +147,75 @@
             body: JSON.stringify(data)
           });
 
-          if (!res.ok) throw new Error();
+          if (!res.ok) throw new Error("Form request failed");
 
           hide(loading);
           show(success);
-        } catch {
+        } catch (e) {
+          console.error(e);
           hide(loading);
           show(error);
         }
       };
     },
 
-    // 💳 STRIPE HELPER (READY FOR YOUR API)
-    pay: async (url) => {
+    // =========================
+    // 💳 STRIPE / PAYMENT HELPER
+    // =========================
+    pay: async (url, data = {}, { loading, error } = {}) => {
       try {
-        const res = await fetch(url, { method: "POST" });
-        const data = await res.json();
+        show(loading);
+        hide(error);
 
-        if (data.url) {
-          window.location.href = data.url;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+
+        if (!res.ok) throw new Error("Payment request failed");
+
+        const json = await res.json();
+
+        if (json.url) {
+          window.location.href = json.url;
         } else {
-          console.error("No checkout URL returned");
+          throw new Error("No checkout URL returned");
         }
-      } catch {
-        console.error("Payment failed");
+      } catch (e) {
+        console.error("Payment error:", e);
+        hide(loading);
+        show(error);
       }
+    },
+
+    // =========================
+    // ✨ SIMPLE ANIMATION
+    // =========================
+    fadeIn: (selector, duration = 400) => {
+      const el = qs(selector);
+      if (!el) return;
+
+      el.style.opacity = 0;
+      el.style.display = "block";
+
+      let last = performance.now();
+
+      const tick = (now) => {
+        el.style.opacity =
+          +el.style.opacity + (now - last) / duration;
+
+        last = now;
+
+        if (+el.style.opacity < 1) {
+          requestAnimationFrame(tick);
+        }
+      };
+
+      requestAnimationFrame(tick);
     }
   };
 
+  // expose globally
   window.cobinar = cobinar;
 })();
