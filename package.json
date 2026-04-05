@@ -1,0 +1,10 @@
+{
+  "name": "cobinar.js",
+  "version": "1.0.0",
+  "description": "Simple frontend to backend bridge",
+  "main": "dist/cobinar.js",
+  "type": "module",
+  "keywords": ["api", "frontend", "javascript", "automation"],
+  "author": "Marc-Arthur Samuel Dalus",
+  "license": "MIT"
+}
