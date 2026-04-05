@@ -1,28 +1,55 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Cobinar Test</title>
+  <title>cobinar.js</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      padding: 40px;
+    }
+    h1 { font-size: 40px; }
+    pre {
+      background: #020617;
+      padding: 15px;
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+    .btn {
+      background: #3b82f6;
+      padding: 10px 20px;
+      border-radius: 8px;
+      color: white;
+      text-decoration: none;
+    }
+  </style>
 </head>
 <body>
 
-<button id="btn">Test API</button>
+<h1>🔥 cobinar.js</h1>
+<p>The easiest way to connect frontend → backend → payments.</p>
 
-<div id="loading" style="display:none;">Loading...</div>
-<div id="success" style="display:none;">Success!</div>
-<div id="error" style="display:none;">Error!</div>
+<a class="btn" href="#start">Get Started</a>
 
-<script src="./dist/cobinar.js"></script>
+<h2 id="start">Install</h2>
 
-<script>
-  cobinar.action({
-    trigger: "#btn",
-    request: () =>
-      cobinar.api("https://jsonplaceholder.typicode.com/todos/1").get(),
-    loading: "#loading",
-    success: "#success",
-    error: "#error"
-  });
-</script>
+<pre>
+&lt;script src="https://js.cobinar.com/dist/cobinar.js"&gt;&lt;/script&gt;
+</pre>
+
+<h2>Example</h2>
+
+<pre>
+const state = cobinar.state({ count: 0 });
+
+state.bind("count", "#app");
+
+cobinar.sync(state, "data", "/api");
+
+cobinar.pay("/checkout");
+</pre>
 
 </body>
 </html>
