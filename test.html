@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cobinar Test</title>
+</head>
+<body>
+
+<button id="btn">Test API</button>
+
+<div id="loading" style="display:none;">Loading...</div>
+<div id="success" style="display:none;">Success!</div>
+<div id="error" style="display:none;">Error!</div>
+
+<script src="./dist/cobinar.js"></script>
+
+<script>
+  cobinar.action({
+    trigger: "#btn",
+    request: () =>
+      cobinar.api("https://jsonplaceholder.typicode.com/todos/1").get(),
+    loading: "#loading",
+    success: "#success",
+    error: "#error"
+  });
+</script>
+
+</body>
+</html>
