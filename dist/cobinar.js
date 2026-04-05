@@ -132,3 +132,37 @@
 
   window.cobinar = cobinar;
 })();
+
+state: (initial) => {
+  const listeners = {};
+
+  const notify = (key, value) => {
+    if (listeners[key]) {
+      listeners[key].forEach((fn) => fn(value));
+    }
+  };
+
+  const state = new Proxy(initial, {
+    set(target, key, value) {
+      target[key] = value;
+      notify(key, value);
+      return true;
+    }
+  });
+
+  state.bind = (key, selector) => {
+    const el = document.querySelector(selector);
+    if (!el) return;
+
+    if (!listeners[key]) listeners[key] = [];
+
+    listeners[key].push((value) => {
+      el.innerText = value;
+    });
+
+    // initial render
+    el.innerText = state[key];
+  };
+
+  return state;
+}
