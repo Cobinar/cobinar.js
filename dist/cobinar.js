@@ -2,7 +2,10 @@
   const qs = (s) => document.querySelector(s);
 
   const config = {
-    baseURL: ""
+    baseURL: "",
+    headers: {
+      "Content-Type": "application/json"
+    }
   };
 
   const cobinar = {
@@ -14,29 +17,23 @@
     },
 
     // =========================
-    // 🔌 API
+    // 🔌 UNIVERSAL REQUEST
     // =========================
-    api: (endpoint) => {
-      const url = config.baseURL + endpoint;
+    request: async ({
+      url,
+      method = "GET",
+      data,
+      headers = {}
+    }) => {
+      const res = await fetch(config.baseURL + url, {
+        method,
+        headers: { ...config.headers, ...headers },
+        body: data ? JSON.stringify(data) : undefined
+      });
 
-      return {
-        get: async () => {
-          const res = await fetch(url);
-          if (!res.ok) throw new Error("GET failed");
-          return res.json();
-        },
+      if (!res.ok) throw new Error("Request failed");
 
-        post: async (data = {}) => {
-          const res = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data)
-          });
-
-          if (!res.ok) throw new Error("POST failed");
-          return res.json();
-        }
-      };
+      return res.json();
     },
 
     // =========================
@@ -77,7 +74,7 @@
     },
 
     // =========================
-    // 🧩 COMPONENTS
+    // 🧩 COMPONENT
     // =========================
     component: (selector, render) => {
       const el = qs(selector);
@@ -88,12 +85,11 @@
       };
 
       update();
-
       return { update };
     },
 
     // =========================
-    // 🌐 ROUTER (SPA)
+    // 🌐 ROUTER
     // =========================
     route: (routes) => {
       const render = () => {
@@ -107,20 +103,21 @@
       window.addEventListener("popstate", render);
 
       document.addEventListener("click", (e) => {
-        if (e.target.matches("[data-link]")) {
-          e.preventDefault();
-          history.pushState(null, "", e.target.href);
-          render();
-        }
+        const link = e.target.closest("[data-link]");
+        if (!link) return;
+
+        e.preventDefault();
+        history.pushState(null, "", link.href);
+        render();
       });
 
       render();
     },
 
     // =========================
-    // 🧾 FORM
+    // 🧾 FORM (UNIVERSAL)
     // =========================
-    form: (selector, { url }) => {
+    form: (selector, handler) => {
       const form = qs(selector);
       if (!form) return;
 
@@ -131,28 +128,43 @@
           new FormData(form).entries()
         );
 
-        await fetch(config.baseURL + url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
+        await handler(data);
       };
     },
 
     // =========================
-    // 💳 PAYMENT
+    // ⚡ ACTION (GENERIC)
     // =========================
-    pay: async (endpoint, data = {}) => {
-      const res = await fetch(config.baseURL + endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
+    action: (selector, handler) => {
+      const el = qs(selector);
+      if (!el) return;
 
-      const json = await res.json();
+      el.onclick = async () => {
+        await handler();
+      };
+    },
 
-      if (json.url) {
-        window.location.href = json.url;
+    // =========================
+    // 💳 PAYMENT (GLOBAL)
+    // =========================
+    pay: async (handler) => {
+      try {
+        const result =
+          typeof handler === "function"
+            ? await handler()
+            : await cobinar.request({
+                url: handler.url,
+                method: "POST",
+                data: handler.data
+              });
+
+        if (result.url) {
+          window.location.href = result.url;
+        } else {
+          throw new Error("No checkout URL returned");
+        }
+      } catch (e) {
+        console.error("Payment error:", e);
       }
     }
   };
