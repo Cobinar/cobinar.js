@@ -1,76 +1,52 @@
 (function () {
-  const qs = (sel) => document.querySelector(sel);
+  const qs = (s) => document.querySelector(s);
 
-  const show = (sel) => {
-    if (!sel) return;
-    const el = qs(sel);
-    if (el) el.style.display = "block";
-  };
-
-  const hide = (sel) => {
-    if (!sel) return;
-    const el = qs(sel);
-    if (el) el.style.display = "none";
+  const config = {
+    baseURL: ""
   };
 
   const cobinar = {
     // =========================
-    // 🔌 API HANDLER
+    // ⚙️ CONFIG
     // =========================
-    api: (url) => ({
-      get: async () => {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("GET request failed");
-        return res.json();
-      },
-
-      post: async (data = {}) => {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
-
-        if (!res.ok) throw new Error("POST request failed");
-        return res.json();
-      }
-    }),
+    config: (opts) => {
+      Object.assign(config, opts);
+    },
 
     // =========================
-    // ⚡ ACTION HANDLER
+    // 🔌 API
     // =========================
-    action: ({ trigger, request, loading, success, error }) => {
-      const btn = qs(trigger);
-      if (!btn) return;
+    api: (endpoint) => {
+      const url = config.baseURL + endpoint;
 
-      btn.onclick = async () => {
-        try {
-          show(loading);
-          hide(success);
-          hide(error);
+      return {
+        get: async () => {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("GET failed");
+          return res.json();
+        },
 
-          await request();
+        post: async (data = {}) => {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+          });
 
-          hide(loading);
-          show(success);
-        } catch (e) {
-          console.error(e);
-          hide(loading);
-          show(error);
+          if (!res.ok) throw new Error("POST failed");
+          return res.json();
         }
       };
     },
 
     // =========================
-    // 🧠 REACTIVE STATE SYSTEM
+    // 🧠 STATE
     // =========================
     state: (initial = {}) => {
       const listeners = {};
 
-      const notify = (key, value) => {
-        if (listeners[key]) {
-          listeners[key].forEach((fn) => fn(value));
-        }
+      const notify = (k, v) => {
+        (listeners[k] || []).forEach((fn) => fn(v));
       };
 
       const state = new Proxy(initial, {
@@ -81,28 +57,19 @@
         }
       });
 
-      // bind UI element to state key
       state.bind = (key, selector) => {
         const el = qs(selector);
         if (!el) return;
 
-        if (!listeners[key]) listeners[key] = [];
+        listeners[key] = listeners[key] || [];
 
-        listeners[key].push((value) => {
-          el.style.transition = "opacity 0.2s ease";
-          el.style.opacity = 0;
-
-          setTimeout(() => {
-            el.innerText =
-              typeof value === "object"
-                ? JSON.stringify(value, null, 2)
-                : value;
-
-            el.style.opacity = 1;
-          }, 100);
+        listeners[key].push((val) => {
+          el.innerText =
+            typeof val === "object"
+              ? JSON.stringify(val, null, 2)
+              : val;
         });
 
-        // initial render
         notify(key, state[key]);
       };
 
@@ -110,112 +77,85 @@
     },
 
     // =========================
-    // 🔄 API → STATE SYNC
+    // 🧩 COMPONENTS
     // =========================
-    sync: async (state, key, url) => {
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Sync failed");
+    component: (selector, render) => {
+      const el = qs(selector);
+      if (!el) return;
 
-        const data = await res.json();
-        state[key] = data;
-      } catch (e) {
-        console.error("Sync error:", e);
-      }
+      const update = () => {
+        el.innerHTML = render();
+      };
+
+      update();
+
+      return { update };
     },
 
     // =========================
-    // 🧾 FORM HANDLER
+    // 🌐 ROUTER (SPA)
     // =========================
-    form: (selector, { url, method = "POST", loading, success, error }) => {
+    route: (routes) => {
+      const render = () => {
+        const path = location.pathname;
+        const view = routes[path] || routes["/"];
+
+        const app = qs("#app");
+        if (app) app.innerHTML = view();
+      };
+
+      window.addEventListener("popstate", render);
+
+      document.addEventListener("click", (e) => {
+        if (e.target.matches("[data-link]")) {
+          e.preventDefault();
+          history.pushState(null, "", e.target.href);
+          render();
+        }
+      });
+
+      render();
+    },
+
+    // =========================
+    // 🧾 FORM
+    // =========================
+    form: (selector, { url }) => {
       const form = qs(selector);
       if (!form) return;
 
       form.onsubmit = async (e) => {
         e.preventDefault();
 
-        const data = Object.fromEntries(new FormData(form).entries());
+        const data = Object.fromEntries(
+          new FormData(form).entries()
+        );
 
-        try {
-          show(loading);
-          hide(success);
-          hide(error);
-
-          const res = await fetch(url, {
-            method,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data)
-          });
-
-          if (!res.ok) throw new Error("Form request failed");
-
-          hide(loading);
-          show(success);
-        } catch (e) {
-          console.error(e);
-          hide(loading);
-          show(error);
-        }
-      };
-    },
-
-    // =========================
-    // 💳 STRIPE / PAYMENT HELPER
-    // =========================
-    pay: async (url, data = {}, { loading, error } = {}) => {
-      try {
-        show(loading);
-        hide(error);
-
-        const res = await fetch(url, {
+        await fetch(config.baseURL + url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data)
         });
-
-        if (!res.ok) throw new Error("Payment request failed");
-
-        const json = await res.json();
-
-        if (json.url) {
-          window.location.href = json.url;
-        } else {
-          throw new Error("No checkout URL returned");
-        }
-      } catch (e) {
-        console.error("Payment error:", e);
-        hide(loading);
-        show(error);
-      }
+      };
     },
 
     // =========================
-    // ✨ SIMPLE ANIMATION
+    // 💳 PAYMENT
     // =========================
-    fadeIn: (selector, duration = 400) => {
-      const el = qs(selector);
-      if (!el) return;
+    pay: async (endpoint, data = {}) => {
+      const res = await fetch(config.baseURL + endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
 
-      el.style.opacity = 0;
-      el.style.display = "block";
+      const json = await res.json();
 
-      let last = performance.now();
-
-      const tick = (now) => {
-        el.style.opacity =
-          +el.style.opacity + (now - last) / duration;
-
-        last = now;
-
-        if (+el.style.opacity < 1) {
-          requestAnimationFrame(tick);
-        }
-      };
-
-      requestAnimationFrame(tick);
+      if (json.url) {
+        window.location.href = json.url;
+      }
     }
   };
 
-  // expose globally
   window.cobinar = cobinar;
 })();
